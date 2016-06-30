@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<beans xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-4.0.xsd"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:batch="http://www.springframework.org/schema/batch"
+       xmlns="http://www.springframework.org/schema/beans">
+
+    <bean id="dataSource"
+          class="org.springframework.jdbc.datasource.DriverManagerDataSource">
+        <property name="driverClassName" value="com.mysql.jdbc.Driver"/>
+        <property name="url"
+                  value="jdbc:mysql://technicaltest.ctkeuweqhlpx.us-east-1.rds.amazonaws.com:3306/movies"/>
+        <property name="username" value="techtest"/>
+        <property name="password" value="playp3n"/>
+    </bean>
+
+</beans>

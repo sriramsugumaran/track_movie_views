@@ -1,0 +1,130 @@
+<?xml version="1.0"?>
+<beans xsi:schemaLocation="http://www.springframework.org/schema/batch
+       http://www.springframework.org/schema/batch/spring-batch-2.2.xsd
+       http://www.springframework.org/schema/beans
+       http://www.springframework.org/schema/beans/spring-beans-3.2.xsd
+       http://www.springframework.org/schema/task
+       http://www.springframework.org/schema/task/spring-task.xsd "
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:batch="http://www.springframework.org/schema/batch"
+       xmlns:task="http://www.springframework.org/schema/task"
+       xmlns="http://www.springframework.org/schema/beans">
+
+    <import resource="classpath:spring/context-datasource.xml"/>
+
+    <bean id="jobLauncher"
+          class="org.springframework.batch.core.launch.support.SimpleJobLauncher">
+        <property ref="jobRepository" name="jobRepository"/>
+    </bean>
+
+    <bean id="jobRepository"
+          class="org.springframework.batch.core.repository.support.MapJobRepositoryFactoryBean"/>
+
+    <bean id="transactionManager"
+          class="org.springframework.batch.support.transaction.ResourcelessTransactionManager"/>
+
+    <batch:job id="trackJob">
+        <batch:step id="step1" next="step2">
+            <batch:tasklet task-executor="taskExecutor"
+                           transaction-manager="transactionManager">
+                <batch:chunk commit-interval="10" reader="databaseReader"
+                             processor="viewProcessor"
+                             writer="viewWriter"/>
+                <batch:listeners>
+                    <batch:listener ref="stepListener"/>
+                    <batch:listener ref="readerListener"/>
+                    <batch:listener ref="writerListener"/>
+                    <batch:listener ref="processorListener"/>
+                </batch:listeners>
+            </batch:tasklet>
+        </batch:step>
+        <batch:step id="step2">
+            <batch:tasklet ref="viewsUploadTasklet">
+                <batch:listeners>
+                    <batch:listener ref="stepListener"/>
+                </batch:listeners>
+            </batch:tasklet>
+        </batch:step>
+    </batch:job>
+
+    <bean id="stepListener"
+          class="com.ram.sri.track.listener.StepListener"/>
+    <bean id="readerListener"
+          class="com.ram.sri.track.listener.ReaderListener"/>
+    <bean id="writerListener"
+          class="com.ram.sri.track.listener.WriterListener"/>
+    <bean id="processorListener"
+          class="com.ram.sri.track.listener.ProcessorListener"/>
+
+    <bean id="taskExecutor"
+          class="org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor">
+        <property name="corePoolSize" value="20"/>
+        <property name="maxPoolSize" value="25"/>
+    </bean>
+
+    <bean id="viewProcessor"
+          class="com.ram.sri.track.process.MovieViewsProcessor" scope="step">
+        <property name="dataAccessor" ref="dataAccessorImpl"/>
+    </bean>
+
+    <bean id="viewWriter" scope="step"
+          class="com.ram.sri.track.output.MovieViewsWriter">
+        <property name="dataAccessor" ref="dataAccessorImpl"/>
+    </bean>
+
+    <bean id="dataAccessorImpl"
+          class="com.ram.sri.track.output.dao.DataAccessorImpl">
+        <property name="awsDbAccessor" ref="awsDbAccessor"/>
+        <property name="vimeoAccessor" ref="vimeoAccessor"/>
+        <property name="s3Accessor" ref="s3Accessor"/>
+    </bean>
+
+    <bean id="vimeoAccessor"
+          class="com.ram.sri.track.output.rest.VimeoAccessor"
+          factory-method="getInstance"/>
+
+    <bean id="awsDbAccessor"
+          class="com.ram.sri.track.output.aws.DynamoDBAccessor"
+          factory-method="getInstance"/>
+
+    <bean id="s3Accessor" class="com.ram.sri.track.output.aws.S3Accessor"
+          factory-method="getInstance"/>
+
+    <bean id="viewsUploadTasklet"
+          class="com.ram.sri.track.output.ViewsUploadTasklet">
+        <property name="dataAccessor" ref="dataAccessorImpl"/>
+    </bean>
+
+    <bean id="databaseReader"
+          class="org.springframework.batch.item.database.JdbcPagingItemReader"
+          scope="step">
+        <property name="dataSource" ref="dataSource"/>
+        <property name="queryProvider">
+            <bean
+                    class="org.springframework.batch.item.database.support.SqlPagingQueryProviderFactoryBean">
+                <property name="dataSource" ref="dataSource"/>
+                <property name="selectClause"
+                          value="SELECT MOVIE_TITLE, SEARCH_TERM"/>
+                <property name="fromClause" value="FROM MOVIE_SEARCH"/>
+                <property name="sortKey" value="MOVIE_TITLE"/>
+            </bean>
+        </property>
+        <property name="pageSize" value="20"/>
+        <property name="rowMapper">
+            <bean class="com.ram.sri.track.input.mapper.MovieSearchMapper"/>
+        </property>
+    </bean>
+
+    <task:scheduled-tasks>
+        <task:scheduled ref="run1hourScheduler" method="launch"
+                        fixed-delay="3600000"/>
+        <!-- 3600000 = 1 hour-->
+    </task:scheduled-tasks>
+
+    <bean id="run1hourScheduler"
+          class="com.ram.sri.track.schedule.ViewScheduler">
+        <property name="jobLauncher" ref="jobLauncher"/>
+        <property name="job" ref="trackJob"/>
+    </bean>
+
+</beans>
