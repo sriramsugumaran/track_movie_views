@@ -19,7 +19,7 @@ public class WriterListener implements ItemWriteListener<MovieSearch> {
     public void beforeWrite(List<? extends MovieSearch> list) {
         for (MovieSearch m : list) {
             if(LOGGER.isInfoEnabled()) {
-                LOGGER.info("Started saving data for title- " + m.getMovieTitle() + " been saved");
+                LOGGER.info("Started saving data for title- " + m.getMovieTitle());
             }
         }
     }
